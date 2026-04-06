@@ -1,0 +1,130 @@
+import MetaTrader5 as mt5
+import pandas as pd
+import numpy as np
+import time
+import winsound
+import os
+import itertools
+import psutil
+import pytz
+from datetime import datetime
+
+# --- 1. CONFIGURACIÓN ---
+config = {
+    "simbolo": "EURUSD",
+    "lote": 0.01,
+    "magic": 123456,
+    "meta_diaria": 10.0,
+    "max_loss": -5.0,
+    "umbral_be": 0.80,        # ETAPA 1 (0.80 USD)
+    "tramo_escalera": 1.50,   # ETAPA 2 (1.50 USD)
+    "paso_pips": 0.00075      # Salto de 7.5 pips
+}
+
+C_V, C_R, C_A, C_C, C_W, C_RESET = '\033[92m', '\033[91m', '\033[93m', '\033[96m', '\033[97m', '\033[0m'
+
+# --- 2. MOTOR DE EJECUCIÓN INTELIGENTE (FIX ERROR FOTOS) ---
+def enviar_operacion_segura(request):
+    # Probamos los 3 modos de llenado para evitar "Unsupported filling mode"
+    for filling in [mt5.ORDER_FILLING_IOC, mt5.ORDER_FILLING_FOK, mt5.ORDER_FILLING_RETURN]:
+        request["type_filling"] = filling
+        res = mt5.order_send(request)
+        if res.retcode == mt5.TRADE_RETCODE_DONE:
+            return res
+    return res
+
+# --- 3. MOTOR DE BLINDAJE PROGRESIVO (ETAPAS 1, 2, 3) ---
+def ejecutar_blindaje(p):
+    profit = p.profit
+    digits = mt5.symbol_info(p.symbol).digits
+    nuevo_sl = 0.0
+    etapa = 0
+
+    if config['umbral_be'] <= profit < config['tramo_escalera']:
+        etapa = 1
+        nuevo_sl = p.price_open + 0.00002 if p.type == 0 else p.price_open - 0.00002
+    elif profit >= config['tramo_escalera']:
+        etapa = int(profit / config['tramo_escalera']) + 1
+        avance = (int(profit / config['tramo_escalera'])) * config['paso_pips']
+        nuevo_sl = p.price_open + avance if p.type == 0 else p.price_open - avance
+
+    if etapa > 0:
+        nuevo_sl = round(nuevo_sl, digits)
+        # Solo modificamos si el cambio es real para evitar "Invalid Request"
+        if (p.type == 0 and nuevo_sl > p.sl + 0.00002) or (p.type == 1 and (nuevo_sl < p.sl - 0.00002 or p.sl == 0)):
+            mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": nuevo_sl, "tp": p.tp})
+            if etapa >= 2: winsound.Beep(1200, 250)
+    return etapa
+
+# --- 4. DASHBOARD OMNI GOLD (COMPLETO) ---
+class Dashboard:
+    def __init__(self):
+        self.spinner = itertools.cycle(['|', '/', '-', '\\'])
+        self.inicio = datetime.now()
+
+    def mostrar(self, sma8, sma21, p_dia, acc, pos, etapa):
+        os.system('cls')
+        t_ny = datetime.now(pytz.timezone('America/New_York'))
+        tick = mt5.symbol_info_tick(config['simbolo'])
+        ping = mt5.terminal_info().ping_last
+        
+        print(f"{C_C}╔══════════════════════════════════════════════════════════════════════════╗{C_RESET}")
+        print(f" {C_C}║{C_W} OMNI v16.00 GOLD FINAL {C_RESET}| {C_A}NY: {t_ny.strftime('%H:%M:%S')} {C_RESET}| {C_C}PING: {ping}ms {C_C}║{C_RESET}")
+        print(f"{C_C}╠══════════════════════════════════════════════════════════════════════════╣{C_RESET}")
+        
+        gap = (sma8 - sma21) * 10000
+        print(f"  [{next(self.spinner)}] STATUS: {C_V}CONECTADO{C_RESET} | CPU: {psutil.cpu_percent()}% | RAM: {psutil.virtual_memory().percent}%")
+        print(f"  MA ACTUAL: SMA8({sma8:.5f}) SMA21({sma21:.5f}) | {C_A}GAP: {gap:+.1f} pips{C_RESET}")
+        print(f"  TENDENCIA: {C_V if gap > 0 else C_R}{'ALCISTA (BULL)' if gap > 0 else 'BAJISTA (BEAR)'}{C_RESET} | SPREAD: {round((tick.ask-tick.bid)*100000, 1)}")
+        
+        print(f"{C_C}╟──────────────────────────────────────────────────────────────────────────╢{C_RESET}")
+        
+        if pos:
+            p = pos[0]
+            status_b = f"{C_V}ETAPA {etapa} (OK){C_RESET}" if etapa >= 2 else (f"{C_A}ETAPA 1 (BE){C_RESET}" if etapa == 1 else f"{C_R}RIESGO{C_RESET}")
+            print(f"  TICKET: #{p.ticket} | {C_A}P/L: {C_V if p.profit>0 else C_R}{p.profit:>6.2f} USD{C_RESET}")
+            print(f"  ENTRADA: {p.price_open:.5f} | ACTUAL: {p.price_current:.5f} | SL: {p.sl:.5f}")
+            print(f"  BLINDAJE: {status_b} | TIEMPO POS: {str(datetime.now()-datetime.fromtimestamp(p.time)).split('.')[0]}")
+        else:
+            print(f"\n               {C_A}--- [ BUSCANDO CRUCE CONFIRMADO 8/21 ] ---{C_RESET}\n")
+
+        print(f"{C_C}╟──────────────────────────────────────────────────────────────────────────╢{C_RESET}")
+        
+        res_col = C_V if p_dia > 0 else (C_R if p_dia < 0 else C_W)
+        print(f"  P/L DÍA: {res_col}{p_dia:>6.2f} USD{C_RESET} | META: ${config['meta_diaria']} | BALANCE: {acc.balance:.2f}")
+        print(f"  EQUIDAD: {acc.equity:.2f} | MARGEN: {acc.margin_level:.0f}% | {C_A}BOT: OPERATIVO{C_RESET}")
+        print(f"{C_C}╚══════════════════════════════════════════════════════════════════════════╝{C_RESET}")
+
+# --- 5. LOOP ---
+if not mt5.initialize(): quit()
+dash = Dashboard()
+
+try:
+    while True:
+        acc, tick = mt5.account_info(), mt5.symbol_info_tick(config['simbolo'])
+        velas = mt5.copy_rates_from_pos(config['simbolo'], mt5.TIMEFRAME_M5, 0, 100)
+        
+        if velas is not None and acc and tick:
+            df = pd.DataFrame(velas)
+            s8, s21 = df['close'].rolling(8).mean().iloc[-1], df['close'].rolling(21).mean().iloc[-1]
+            atr = (df['high']-df['low']).rolling(14).mean().iloc[-1]
+            
+            hist = mt5.history_deals_get(datetime.now().replace(hour=0,minute=0,second=0), datetime.now())
+            p_dia = sum(d.profit for d in hist if d.magic == config['magic']) if hist else 0.0
+            pos = mt5.positions_get(symbol=config['simbolo'], magic=config['magic'])
+            
+            etapa = ejecutar_blindaje(pos[0]) if pos else 0
+            dash.mostrar(s8, s21, p_dia, acc, pos, etapa)
+
+            t_ny = datetime.now(pytz.timezone('America/New_York'))
+            if not pos and (8 <= t_ny.hour <= 16) and p_dia < config['meta_diaria']:
+                if s8 > s21: # BUY
+                    req = {"action": mt5.TRADE_ACTION_DEAL, "symbol": config['simbolo'], "volume": config['lote'], "type": mt5.ORDER_TYPE_BUY, "price": tick.ask, "magic": config['magic'], "sl": round(tick.ask - (atr*2), 5), "tp": round(tick.ask + (atr*8), 5)}
+                    enviar_operacion_segura(req)
+                elif s8 < s21: # SELL
+                    req = {"action": mt5.TRADE_ACTION_DEAL, "symbol": config['simbolo'], "volume": config['lote'], "type": mt5.ORDER_TYPE_SELL, "price": tick.bid, "magic": config['magic'], "sl": round(tick.bid + (atr*2), 5), "tp": round(tick.bid - (atr*8), 5)}
+                    enviar_operacion_segura(req)
+
+        time.sleep(1)
+except Exception as e: print(f"Error: {e}")
+finally: mt5.shutdown()

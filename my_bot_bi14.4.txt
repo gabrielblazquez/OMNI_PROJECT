@@ -1,0 +1,182 @@
+import MetaTrader5 as mt5
+import pandas as pd
+import numpy as np
+import time
+import winsound
+import ctypes
+import os
+import itertools
+import ntplib
+import psutil
+import pytz
+import keyboard
+import msvcrt
+from datetime import datetime, timedelta
+
+# --- 1. CONFIGURACIÓN ---
+config = {
+    "simbolo": "EURUSD",
+    "lote": 0.01,
+    "magic": 123456,
+    "meta_diaria": 5.0,
+    "max_loss_perc": 0.05,
+    "ciclo_velas": 1490,
+    "login": 5048394053,
+    "password": "Zq!sZl0x",
+    "server": "MetaQuotes-Demo"
+}
+
+def obtener_offset():
+    try: return ntplib.NTPClient().request('pool.ntp.org', timeout=2).tx_time - time.time()
+    except: return 0
+
+OFFSET = obtener_offset()
+def ahora_loc(): return datetime.now() + timedelta(seconds=OFFSET)
+def ahora_ny(): return datetime.now(pytz.utc).astimezone(pytz.timezone('America/New_York')) + timedelta(seconds=OFFSET)
+
+def registrar_bitacora(mensaje):
+    ruta = os.path.join(os.environ['USERPROFILE'], 'Desktop', 'bitacora_trading.txt')
+    try:
+        with open(ruta, "a") as f:
+            f.write(f"[{ahora_loc().strftime('%Y-%m-%d %H:%M:%S')}] {mensaje}\n")
+    except: pass
+
+# --- 2. GESTIÓN DINÁMICA DE POSICIONES (BREAK-EVEN & TRAILING) ---
+def gestionar_proteccion(posicion, u_atr):
+    p = posicion
+    simbolo_info = mt5.symbol_info(config['simbolo'])
+    digits = simbolo_info.digits
+    point = simbolo_info.point
+    
+    riesgo_inicial = abs(p.price_open - p.sl) if p.sl != 0 else u_atr * 2
+    if riesgo_inicial == 0: return
+
+    distancia_actual = abs(p.price_current - p.price_open)
+    ratio_actual = distancia_actual / riesgo_inicial
+    nuevo_sl = 0.0
+    
+    # --- PRUEBA DE CAMPO (0.05) ---
+    if 0.05 <= ratio_actual < 2.0:
+        respiro = 20 * point 
+        target_be = p.price_open + (respiro if p.type == 0 else -respiro)
+        if (p.type == 0 and target_be > p.sl) or (p.type == 1 and (target_be < p.sl or p.sl == 0)):
+            nuevo_sl = target_be
+
+    elif ratio_actual >= 2.0:
+        escalon = int(ratio_actual) - 1
+        distancia_protegida = riesgo_inicial * escalon
+        target_sl = p.price_open + (distancia_protegida if p.type == 0 else -distancia_protegida)
+        if (p.type == 0 and target_sl > p.sl) or (p.type == 1 and (target_sl < p.sl or p.sl == 0)):
+            nuevo_sl = target_sl
+
+    if nuevo_sl != 0:
+        nuevo_sl = round(nuevo_sl, digits)
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "symbol": p.symbol,
+            "position": p.ticket,
+            "sl": nuevo_sl,
+            "tp": p.tp
+        }
+        res = mt5.order_send(request)
+        if res.retcode == mt5.TRADE_RETCODE_DONE:
+            winsound.Beep(1200, 100)
+            registrar_bitacora(f"PROTECCIÓN: SL movido a {nuevo_sl} (Ratio: {ratio_actual:.2f})")
+
+# --- 3. DASHBOARD PROFESIONAL v14.3 ---
+class TradingMonitor:
+    def __init__(self):
+        self.spinner = itertools.cycle(['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
+
+    def mostrar(self, u8, u21, u_atr, p_dia, acc, pos, bot_habilitado):
+        os.system('cls')
+        t_loc, t_ny = ahora_loc(), ahora_ny()
+        tick = mt5.symbol_info_tick(config['simbolo'])
+        if not tick: return
+        
+        flotante = sum(p.profit for p in pos) if pos else 0.0
+        diff_pips = (u8 - u21) * 10000
+
+        print(f"╔══════════════════════════════════════════════════╗")
+        print(f"║   {config['simbolo']} v14.4 - DASHBOARD DE ALTA PRECISIÓN  ║")
+        print(f"╚══════════════════════════════════════════════════╝")
+        print(f" SESIÓN: {'🟢 NY OPEN' if (9<=t_ny.hour<16) else '⚪ FUERA DE NY'} | NY: {t_ny.strftime('%H:%M:%S')}")
+        print(f" STATUS: [{next(self.spinner)}] | CUENTA: {acc.login} | SAFE: {('✅' if bot_habilitado else '❌')}")
+        print(f"----------------------------------------------------")
+        print(f" TENDENCIA : {'▲ BULLISH' if diff_pips > 0 else '▼ BEARISH'} ({diff_pips:+.1f} pips)")
+        print(f" VOLATILIDAD: {u_atr*10000:.1f} pips | CICLO: {config['ciclo_velas']} velas")
+        print(f"----------------------------------------------------")
+
+        if pos:
+            p = pos[0]
+            riesgo_i = abs(p.price_open - p.sl) if p.sl != 0 else (u_atr * 2)
+            ratio = abs(p.price_current - p.price_open) / riesgo_i if riesgo_i > 0 else 0
+            pips_al_tp = abs(p.tp - p.price_current) * 10000 
+            
+            if p.sl == 0: fase = "SIN PROTECCIÓN (ALERTA)"
+            elif (p.type == 0 and p.sl > p.price_open) or (p.type == 1 and p.sl < p.price_open): fase = "ASEGURANDO GANANCIAS 💰"
+            elif round(p.sl, 5) == round(p.price_open, 5): fase = "BREAK-EVEN (RIESGO 0) 🛡️"
+            else: fase = "RIESGO INICIAL 🎲"
+
+            print(f" 🟢 POSICIÓN ACTIVA: {p.ticket} | P/L: {p.profit:>6.2f} USD")
+            print(f" ENTRADA : {p.price_open:.5f} | ACTUAL: {p.price_current:.5f}")
+            print(f" RATIO RR: {ratio:.2f} | FASE: {fase}")
+            print(f" OBJETIVO: {pips_al_tp:.1f} PIPS RESTANTES PARA TP 🎯")
+            print(f" SL ACTUAL: {p.sl:.5f} | TP: {p.tp:.5f}")
+            print(f" [F4] CERRAR TODO (PANIC)")
+        else:
+            print(f" 💤 MODO: BUSCANDO CRUCE SMA 8/21 EN M5")
+            print(f" ESPERANDO SEÑAL NY (09:30 - 15:00)")
+
+        print(f"----------------------------------------------------")
+        print(f" P/L DIA : {p_dia:>7.2f} USD | EQUITY: {(acc.balance + flotante):>8.2f}")
+        print(f" BALANCE : {acc.balance:>7.2f} USD | SPREAD: {(tick.ask-tick.bid)*100000:.1f}")
+        print(f"====================================================")
+
+# --- 4. EJECUCIÓN ---
+if not mt5.initialize(login=config['login'], password=config['password'], server=config['server']):
+    quit()
+
+monitor = TradingMonitor()
+ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)
+
+try:
+    while True:
+        if keyboard.is_pressed('f4'): 
+            for p in (mt5.positions_get(symbol=config['simbolo']) or []):
+                mt5.Close(config['simbolo'], ticket=p.ticket)
+            winsound.Beep(1000, 500)
+
+        acc = mt5.account_info()
+        t_ny = ahora_ny()
+        inicio_dia = ahora_loc().replace(hour=0, minute=0, second=0)
+        hist = mt5.history_deals_get(inicio_dia, ahora_loc())
+        p_dia = sum(d.profit + d.commission + d.swap for d in hist) if hist else 0.0
+        bot_habilitado = p_dia > -(acc.balance * config['max_loss_perc'])
+
+        velas = mt5.copy_rates_from_pos(config['simbolo'], mt5.TIMEFRAME_M5, 0, config['ciclo_velas'])
+        if velas is not None:
+            df = pd.DataFrame(velas)
+            u8, u21 = df['close'].rolling(8).mean().iloc[-1], df['close'].rolling(21).mean().iloc[-1]
+            df['tr'] = np.maximum(df['high']-df['low'], np.maximum(abs(df['high']-df['close'].shift()), abs(df['low']-df['close'].shift())))
+            u_atr = df['tr'].rolling(14).mean().iloc[-1]
+            
+            pos = mt5.positions_get(symbol=config['simbolo'])
+            monitor.mostrar(u8, u21, u_atr, p_dia, acc, pos, bot_habilitado)
+            
+            if pos:
+                gestionar_proteccion(pos[0], u_atr)
+
+            es_ny = (t_ny.hour == 9 and t_ny.minute >= 30) or (10 <= t_ny.hour < 15)
+            if not pos and bot_habilitado and es_ny:
+                t = mt5.symbol_info_tick(config['simbolo'])
+                if u8 > u21: # COMPRA
+                    sl_p = round(t.ask-(u_atr*2), 5)
+                    tp_p = round(t.ask+(u_atr*7), 5)
+                    mt5.order_send({"action": mt5.TRADE_ACTION_DEAL, "symbol": config['simbolo'], "volume": config['lote'], "type": mt5.ORDER_TYPE_BUY, "price": t.ask, "magic": config['magic'], "sl": sl_p, "tp": tp_p, "type_filling": mt5.ORDER_FILLING_IOC})
+
+        time.sleep(1)
+except Exception as e:
+    registrar_bitacora(f"Error: {e}")
+finally:
+    mt5.shutdown()

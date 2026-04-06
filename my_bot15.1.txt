@@ -1,0 +1,151 @@
+import MetaTrader5 as mt5
+import pandas as pd
+import numpy as np
+import time
+import os
+from datetime import datetime, timedelta
+from colorama import init, Fore, Style
+
+init(autoreset=True)
+
+# --- 1. CONFIGURACIÓN ---
+config = {
+    "simbolo": "EURUSD",      
+    "lote": 0.01,             
+    "magic": 150000,           
+    "sl_pips": 150,           
+    "tp_pips": 450,           
+    "muro_activacion": 80,    
+    "distancia_trail": 30,
+    "meta_semanal_usd": 7.80,
+    "balance_inicial": 77.93,
+    "memoria_operaciones": 5   # Analiza las últimas 5 trades
+}
+
+# --- 2. CEREBRO Y MEMORIA ---
+def analizar_memoria():
+    # Miramos el historial de hoy para aprender de los aciertos/errores
+    desde = datetime.now() - timedelta(hours=24)
+    hasta = datetime.now()
+    history = mt5.history_deals_get(desde, hasta)
+    
+    if history is None or len(history) == 0:
+        return 0.0, "SIN HISTORIAL RECIENTE"
+
+    # Filtramos por nuestro Magic para no confundir con la v12
+    mis_ganancias = [d.profit for d in history if d.magic == config["magic"] and d.entry == 1]
+    recientes = mis_ganancias[-config["memoria_operaciones"]:]
+    
+    suma_racha = sum(recientes)
+    if len(recientes) >= 3 and suma_racha < -2.50:
+        return suma_racha, "MODO PRECAUCION - EVITANDO RACHA"
+    return suma_racha, "ESTADO DE MEMORIA SALUDABLE"
+
+def obtener_regimen(df):
+    adx = df['adx'].iloc[-1]
+    atr = df['atr'].iloc[-1]
+    atr_sma = df['atr'].rolling(20).mean().iloc[-1]
+    
+    if adx < 18:
+        return "[!] RANGO - NO OPERAR", Fore.RED, False
+    elif atr > (atr_sma * 2.5):
+        return "[!] VOLATILIDAD ALTA - NEWS", Fore.MAGENTA, False
+    elif adx > 25:
+        return "[OK] TENDENCIA LIMPIA", Fore.GREEN, True
+    else:
+        return "[-] ZONA NEUTRAL", Fore.CYAN, False
+
+# --- 3. INDICADORES ---
+def calcular_indicadores(df):
+    df['s8'] = df['close'].rolling(8).mean()
+    df['s21'] = df['close'].rolling(21).mean()
+    # ATR
+    high_low = df['high'] - df['low']
+    high_cp = np.abs(df['high'] - df['close'].shift())
+    low_cp = np.abs(df['low'] - df['close'].shift())
+    df['tr'] = np.max(np.stack([high_low, high_cp, low_cp], axis=1), axis=1)
+    df['atr'] = df['tr'].rolling(14).mean()
+    # ADX Simplificado
+    up = df['high'].diff(); down = -df['low'].diff()
+    plus_dm = np.where((up > down) & (up > 0), up, 0)
+    minus_dm = np.where((down > up) & (down > 0), down, 0)
+    df['adx'] = 100 * (abs(pd.Series(plus_dm).rolling(14).mean() - pd.Series(minus_dm).rolling(14).mean()) / 
+                (pd.Series(plus_dm).rolling(14).mean() + pd.Series(minus_dm).rolling(14).mean())).rolling(14).mean()
+    return df
+
+# --- 4. DASHBOARD COMPATIBLE CMD ---
+def imprimir_dash(acc, tick, df, pos, r_val, r_txt):
+    os.system('cls' if os.name == 'nt' else 'clear')
+    status, s_col, _ = obtener_regimen(df)
+    adx, atr = df['adx'].iloc[-1], df['atr'].iloc[-1]
+    ganancia_neta = acc.equity - config["balance_inicial"]
+    
+    print(f"{Fore.MAGENTA}==============================================================")
+    print(f"{Fore.WHITE}   OMNI BRAIN v15.1   |  {datetime.now().strftime('%H:%M:%S')}  | HP G42 CORE")
+    print(f"{Fore.MAGENTA}==============================================================")
+    print(f"{Fore.WHITE} VEREDICTO: {s_col}{status}")
+    print(f"{Fore.WHITE} MEMORIA  : {Fore.YELLOW}{r_txt} ({r_val:.2f} USD)")
+    print(f"{Fore.MAGENTA}--------------------------------------------------------------")
+    print(f"{Fore.CYAN} EQUITY : {Fore.WHITE}{acc.equity:<8.2f} {Fore.CYAN} P/L SEM: {Fore.WHITE}{ganancia_neta:>+6.2f} USD")
+    print(f"{Fore.CYAN} ADX (F): {Fore.WHITE}{adx:<8.1f} {Fore.CYAN} ATR (V): {Fore.WHITE}{atr:>8.5f}")
+    print(f"{Fore.MAGENTA}--------------------------------------------------------------")
+    
+    if pos:
+        p = pos[0]
+        p_col = Fore.GREEN if p.profit >= 0 else Fore.RED
+        dist = abs(tick.bid - p.price_open) / 0.0001
+        print(f"{Fore.WHITE} ORDEN: {p_col}{p.profit:>+7.2f} USD | DIST: {Fore.YELLOW}{dist:>5.1f} Pips | SL: {p.sl:.5f}")
+    else:
+        print(f"{Fore.WHITE} >> ANALIZANDO ESCENARIO Y MEMORIA PARA ENTRAR <<")
+    print(f"{Fore.MAGENTA}==============================================================")
+
+# --- 5. EJECUCIÓN PRINCIPAL ---
+if not mt5.initialize(): quit()
+
+try:
+    while True:
+        rates = mt5.copy_rates_from_pos(config["simbolo"], mt5.TIMEFRAME_M5, 0, 100)
+        acc, tick = mt5.account_info(), mt5.symbol_info_tick(config["simbolo"])
+        if rates is None or acc is None: continue
+        
+        df = calcular_indicadores(pd.DataFrame(rates))
+        r_val, r_txt = analizar_memoria()
+        pos = mt5.positions_get(symbol=config["simbolo"], magic=config["magic"])
+        
+        imprimir_dash(acc, tick, df, pos, r_val, r_txt)
+        
+        # Lógica de Entrada con Memoria
+        _, _, permitido = obtener_regimen(df)
+        if not pos and permitido and "PRECAUCION" not in r_txt:
+            s8_n, s21_n = df['s8'].iloc[-1], df['s21'].iloc[-1]
+            s8_p, s21_p = df['s8'].iloc[-2], df['s21'].iloc[-2]
+            
+            tipo = None
+            if s8_p <= s21_p and s8_n > s21_n: tipo = mt5.ORDER_TYPE_BUY
+            elif s8_p >= s21_p and s8_n < s21_n: tipo = mt5.ORDER_TYPE_SELL
+            
+            if tipo is not None:
+                precio = tick.ask if tipo == mt5.ORDER_TYPE_BUY else tick.bid
+                punto = mt5.symbol_info(config["simbolo"]).point
+                sl = precio - (config["sl_pips"] * punto) if tipo == mt5.ORDER_TYPE_BUY else precio + (config["sl_pips"] * punto)
+                tp = precio + (config["tp_pips"] * punto) if tipo == mt5.ORDER_TYPE_BUY else precio - (config["tp_pips"] * punto)
+                
+                mt5.order_send({
+                    "action": mt5.TRADE_ACTION_DEAL, "symbol": config["simbolo"], "volume": config["lote"],
+                    "type": tipo, "price": precio, "sl": round(sl, 5), "tp": round(tp, 5),
+                    "magic": config["magic"], "comment": "OMNI v15.1 BRAIN",
+                    "type_time": mt5.ORDER_TIME_GTC, "type_filling": 1
+                })
+
+        # Escalera Dinámica
+        elif pos:
+            p = pos[0]; punto = mt5.symbol_info(config["simbolo"]).point
+            dist = (tick.bid - p.price_open) if p.type == 0 else (p.price_open - tick.bid)
+            if dist > (config["muro_activacion"] * punto):
+                n_sl = tick.bid - (config["distancia_trail"] * punto) if p.type == 0 else tick.bid + (config["distancia_trail"] * punto)
+                if (p.type == 0 and n_sl > p.sl) or (p.type == 1 and (n_sl < p.sl or p.sl == 0)):
+                    mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "symbol": config["simbolo"], "position": p.ticket, "sl": round(n_sl, 5), "tp": p.tp})
+
+        time.sleep(3)
+except Exception as e: print(e)
+finally: mt5.shutdown()

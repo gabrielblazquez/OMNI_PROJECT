@@ -1,0 +1,203 @@
+import MetaTrader5 as mt5
+import pandas as pd
+import numpy as np
+import time
+import winsound
+import os
+import itertools
+import ntplib
+import psutil
+import pytz
+import keyboard
+import msvcrt 
+from datetime import datetime, timedelta
+
+# --- 1. CONFIGURACIÓN ---
+config = {
+    "simbolo": "EURUSD",
+    "lote": 0.01,
+    "magic": 123456,
+    "meta_diaria": 10.0,
+    "ciclo_velas": 1490
+}
+
+# --- 2. RELOJ DE ALTA PRECISIÓN ---
+def obtener_offset():
+    try: return ntplib.NTPClient().request('pool.ntp.org', timeout=2).tx_time - time.time()
+    except: return 0
+
+OFFSET = obtener_offset()
+def ahora_loc(): return datetime.now() + timedelta(seconds=OFFSET)
+def ahora_ny():
+    try:
+        utc = datetime.now(pytz.utc) + timedelta(seconds=OFFSET)
+        return utc.astimezone(pytz.timezone('America/New_York'))
+    except: return ahora_loc()
+
+# --- 3. MENÚ INTERACTIVO ---
+def input_seguro(prompt, timeout=12):
+    print(prompt, end='', flush=True)
+    start_time = time.time()
+    input_str = ''
+    while True:
+        if msvcrt.kbhit():
+            char = msvcrt.getche().decode('utf-8')
+            if char in ['\r', '\n']:
+                print(); return input_str
+            input_str += char
+        if (time.time() - start_time) > timeout: return None
+        time.sleep(0.1)
+
+def menu_configuracion():
+    winsound.Beep(440, 200)
+    temp = config.copy()
+    os.system('cls')
+    print("====================================================")
+    print("      MENU DE CONFIGURACION v13.9 (GABRIEL)         ")
+    print("====================================================")
+    print(f" 1. Lote: {temp['lote']} | 2. Simbolo: {temp['simbolo']}")
+    print(f" 3. Meta: ${temp['meta_diaria']} | 4. Ciclo: {temp['ciclo_velas']}")
+    print("----------------------------------------------------")
+    print(" [G] GUARDAR Y SALIR  |  [Q] SALIR SIN GUARDAR")
+    op = input_seguro("Seleccione opción: ").upper()
+    if op == "1":
+        v = input_seguro("Nuevo Lote: ")
+        if v: temp['lote'] = float(v)
+    elif op == "2":
+        v = input_seguro("Nuevo Simbolo: ")
+        if v: temp['simbolo'] = v.upper()
+    elif op == "G":
+        config.update(temp)
+        print("[OK] Configuración actualizada."); time.sleep(1)
+
+# --- 4. DASHBOARD PROFESIONAL ---
+class Dashboard:
+    def __init__(self):
+        self.spinner = itertools.cycle(['|', '/', '-', '\\'])
+
+    def mostrar(self, u8, u21, u_atr, p_dia, acc, pos):
+        os.system('cls')
+        t_loc, t_ny = ahora_loc(), ahora_ny()
+        tick = mt5.symbol_info_tick(config['simbolo'])
+        if not tick: return
+        
+        bat = psutil.sensors_battery()
+        pwr = "🔌 AC" if (bat.power_plugged if bat else True) else "🔋 BAT"
+
+        print(f"====================================================")
+        print(f"      {config['simbolo']} v13.9 - SISTEMA DE TRADING VIVO      ")
+        print(f"====================================================")
+        print(f" SAFE-MODE: ☑ OPERATIVO | SPREAD: {(tick.ask-tick.bid)*100000:.1f} | {pwr}")
+        print(f" PC TIME (Net): {t_loc.strftime('%H:%M:%S')} | NY TIME: {t_ny.strftime('%H:%M:%S')}")
+        print(f" STATUS: [{next(self.spinner)}] | CUENTA: {acc.login} | OFFSET: {OFFSET:.1f}s")
+        print(f"----------------------------------------------------")
+        print(f" [C] CONFIGURAR | [X] PANICO | LOTE: {config['lote']}")
+        print(f"----------------------------------------------------")
+        
+        gap = (u8 - u21) * 10000
+        print(f" TENDENCIA : {'▲ BULLISH' if gap > 0 else '▼ BEARISH'} ({gap:+.1f} pips)")
+        print(f" VELAS M5  : CIERRA EN {5-(t_loc.minute%5):02d}m | ATR: {u_atr*10000:.1f} pips")
+        print(f"----------------------------------------------------")
+
+        if pos:
+            p = pos[0]
+            dist_tp = abs(p.tp - p.price_current) * 10000
+            
+            # Cálculo de Ratio para el Dash
+            riesgo = abs(p.price_open - p.sl)
+            ratio = abs(p.price_current - p.price_open) / riesgo if riesgo > 0 else 0
+            
+            print(f" 📑 [POSICION ACTIVA] TICKET: {p.ticket}")
+            print(f" P/L ACTUAL : {p.profit:>8.2f} USD")
+            print(f" RATIO RR   : {ratio:.2f}")
+            print(f" ESCALÓN    : {int(ratio)} | DIST. A TP: {dist_tp:.1f} pips")
+            if p.sl > p.price_open or (p.type == 1 and p.sl < p.price_open and p.sl != 0): 
+                print(" 🛡️ PROTECCIÓN: ESCALERA ACTIVA")
+        else:
+            print(f"\n ... BUSCANDO SEÑAL NY (09:30 - 15:00) ...\n")
+
+        print(f"----------------------------------------------------")
+        print(f" RESUMEN DEL DIA (P/L BOT): {p_dia:>7.2f} USD")
+        print(f" EQUITY (Actual)          : {acc.equity:>10.2f} USD")
+        print(f" BALANCE (Cerrado)        : {acc.balance:>10.2f} USD")
+        print(f" MARGEN LIBRE             : {acc.margin_free:>10.2f} USD")
+        print(f"====================================================")
+
+# --- 5. BUCLE PRINCIPAL DE OPERACIONES ---
+if not mt5.initialize(): quit()
+dash = Dashboard()
+
+try:
+    while True:
+        if keyboard.is_pressed('c'): menu_configuracion()
+        if keyboard.is_pressed('x'):
+            for p in (mt5.positions_get(symbol=config['simbolo']) or []):
+                mt5.Close(config['simbolo'], ticket=p.ticket)
+            winsound.Beep(1000, 500)
+
+        acc = mt5.account_info()
+        velas = mt5.copy_rates_from_pos(config['simbolo'], mt5.TIMEFRAME_M5, 0, 50)
+        
+        if velas is not None and acc:
+            df = pd.DataFrame(velas)
+            u8 = df['close'].rolling(8).mean().iloc[-1]
+            u21 = df['close'].rolling(21).mean().iloc[-1]
+            u_atr = (df['high']-df['low']).rolling(14).mean().iloc[-1]
+            
+            # Historial corregido
+            inicio_dia = ahora_loc().replace(hour=0, minute=0, second=0, microsecond=0)
+            hist = mt5.history_deals_get(inicio_dia, ahora_loc())
+            p_dia = 0.0
+            if hist:
+                for d in hist:
+                    if d.magic == config['magic'] and d.symbol == config['simbolo']:
+                        p_dia += d.profit + d.commission + d.swap
+            
+            pos = mt5.positions_get(symbol=config['simbolo'])
+            dash.mostrar(u8, u21, u_atr, p_dia, acc, pos)
+
+            # Lógica de Trading NY
+            t_ny = ahora_ny()
+            if not pos and (9 <= t_ny.hour <= 15) and p_dia < config['meta_diaria']:
+                if u8 > u21:
+                    tick = mt5.symbol_info_tick(config['simbolo'])
+                    mt5.order_send({
+                        "action": mt5.TRADE_ACTION_DEAL, "symbol": config['simbolo'], "volume": config['lote'],
+                        "type": mt5.ORDER_TYPE_BUY, "price": tick.ask,
+                        "sl": round(tick.ask - (u_atr * 2), 5), "tp": round(tick.ask + (u_atr * 7), 5),
+                        "magic": config['magic'], "type_filling": mt5.ORDER_FILLING_IOC
+                    })
+
+            # --- PROTECCIÓN DINÁMICA POR RATIO (ESCALERA) ---
+            if pos:
+                p = pos[0]
+                riesgo_inicial = abs(p.price_open - p.sl)
+                
+                if riesgo_inicial > 0:
+                    recorrido = abs(p.price_current - p.price_open)
+                    ratio_actual = recorrido / riesgo_inicial
+                    escalon_actual = int(ratio_actual)
+                    nuevo_sl = 0.0
+                    digits = mt5.symbol_info(config['simbolo']).digits
+
+                    if escalon_actual == 1:
+                        respiro = 2 * (10**-digits)
+                        nuevo_sl = p.price_open + (respiro if p.type == 0 else -respiro)
+                    elif escalon_actual >= 2:
+                        distancia_segura = riesgo_inicial * (escalon_actual - 1)
+                        nuevo_sl = p.price_open + (distancia_segura if p.type == 0 else -distancia_segura)
+
+                    if nuevo_sl != 0:
+                        nuevo_sl = round(nuevo_sl, digits)
+                        es_mejor = (p.type == 0 and nuevo_sl > p.sl) or (p.type == 1 and (nuevo_sl < p.sl or p.sl == 0))
+                        
+                        if es_mejor:
+                            mt5.order_send({
+                                "action": mt5.TRADE_ACTION_SLTP, "symbol": config['simbolo'], 
+                                "position": p.ticket, "sl": nuevo_sl, "tp": p.tp
+                            })
+                            winsound.Beep(1200, 100)
+
+        time.sleep(0.5)
+except Exception: pass
+finally: mt5.shutdown()

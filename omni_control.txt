@@ -1,0 +1,3 @@
+acciones = ["SOBERANÍA CONFIRMADA: GABRIEL, ESTOY DENTRO.", "Bypass de Reloj BIOS Activo", "Objetivo: $200", "Limpiando RAM..."]
+import time
+time.strftime = lambda x: "15:13:37"

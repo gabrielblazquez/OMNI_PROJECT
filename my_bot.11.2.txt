@@ -1,0 +1,161 @@
+import MetaTrader5 as mt5
+import pandas as pd
+import numpy as np
+import time
+import winsound
+import ctypes
+import os
+import itertools
+import ntplib
+import psutil
+import pytz
+from datetime import datetime, timedelta
+
+# --- 1. NÚCLEO DE TIEMPO Y RUTAS ---
+def obtener_offset():
+    try: return ntplib.NTPClient().request('pool.ntp.org').tx_time - time.time()
+    except: return 0
+
+OFFSET = obtener_offset()
+def ahora_loc(): return datetime.now() + timedelta(seconds=OFFSET)
+def ahora_ny(): return datetime.now(pytz.timezone('America/New_York')) + timedelta(seconds=OFFSET)
+
+def registrar_bitacora(mensaje):
+    ruta = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop', 'bitacora_trading.txt')
+    try:
+        with open(ruta, "a") as f:
+            f.write(f"[{ahora_loc().strftime('%Y-%m-%d %H:%M:%S')}] {mensaje}\n")
+    except: pass
+
+def info_energia():
+    try:
+        b = psutil.sensors_battery()
+        if b is None: return "🔌 AC"
+        return f"{'🔌 AC' if getattr(b, 'power_plugged', True) else '🔋 BAT'} {getattr(b, 'percent', 100)}%"
+    except: return "⚡ OK"
+
+# --- 2. DASHBOARD v11.2 (SISTEMA INTEGRADO) ---
+class TradingMonitor:
+    def __init__(self, simbolo):
+        self.simbolo = simbolo
+        self.spinner = itertools.cycle(['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
+
+    def limpiar(self): os.system('cls' if os.name == 'nt' else 'clear')
+
+    def mostrar(self, u8, u21, u_atr, p_dia, acc, pos, safe_status):
+        self.limpiar()
+        t_loc, t_ny = ahora_loc(), ahora_ny()
+        tick = mt5.symbol_info_tick(self.simbolo)
+        if not tick or not acc: return
+        
+        seg_v = (t_loc.minute % 5) * 60 + t_loc.second
+        min_r, seg_r = divmod((5 * 60) - seg_v, 60)
+        flotante = sum(p.profit for p in pos) if pos else 0.0
+
+        print(f"╔══════════════════════════════════════════════════╗")
+        print(f"║      EURUSD v11.2 - NY SESSION INTEGRATED        ║")
+        print(f"╚══════════════════════════════════════════════════╝")
+        status_txt = "✅ OPERATIVO" if safe_status else "❌ BLOQUEADO (Max Loss)"
+        print(f" SAFE-MODE: {status_txt} | SPREAD: {(tick.ask-tick.bid)*100000:.1f} | NY: {t_ny.strftime('%H:%M:%S')}")
+        print(f" STATUS: [{next(self.spinner)}] | CUENTA: {acc.login} | {info_energia()}")
+        print(f"----------------------------------------------------")
+        
+        diff = (u8 - u21) * 10000
+        print(f" TENDENCIA : {'▲ BULLISH' if diff > 0 else '▼ BEARISH'} ({diff:+.1f} pips)")
+        print(f" VELAS CICLO: 1490 | M5 CIERRA EN: {min_r:02d}:{seg_r:02d}")
+        print(f" VOLATILIDAD (ATR): {u_atr*10000:.1f} pips")
+        print(f"----------------------------------------------------")
+
+        if pos:
+            p = pos[0]
+            pips_tp = abs(p.tp - p.price_current) * 10000
+            riesgo_actual = (abs(p.sl - p.price_current) / p.price_current) * 100 if p.sl != 0 else 0.0
+            print(f" 🟢 POSICIÓN ACTIVA: {p.ticket}")
+            print(f" ENTRADA: {p.price_open:.5f} | ACTUAL: {p.price_current:.5f}")
+            print(f" TARGET (TP): {p.tp:.5f} ({pips_tp:.1f} pips rest.) 🎯")
+            print(f" PROFIT : {p.profit:>6.2f} USD | RISK: {riesgo_actual:.2f}%")
+        else:
+            print(f" 💤 BUSCANDO SEÑAL NY (09:30 - 15:00)")
+
+        print(f"----------------------------------------------------")
+        print(f" P/L DIA  : {p_dia:>7.2f} USD | BALANCE: {acc.balance:>8.2f}")
+        print(f" EQUITY   : {(acc.balance + flotante):>7.2f} USD | OFFSET: {OFFSET:.1f}s")
+        print(f"====================================================")
+
+# --- 3. BUCLE PRINCIPAL CON PARCHE DE EJECUCIÓN ---
+if not mt5.initialize(): quit()
+monitor = TradingMonitor("EURUSD")
+ctypes.windll.kernel32.SetThreadExecutionState(0x80000001)
+
+try:
+    while True:
+        terminal = mt5.terminal_info()
+        if terminal is None or not getattr(terminal, 'connected', False):
+            print("Esperando conexión con MetaTrader 5..."); mt5.initialize(); time.sleep(5); continue
+        
+        acc = mt5.account_info()
+        if acc is None: time.sleep(1); continue
+            
+        t_ny = ahora_ny()
+        inicio_dia = ahora_loc().replace(hour=0, minute=0, second=0)
+        hist = mt5.history_deals_get(inicio_dia, ahora_loc())
+        p_dia = sum(d.profit for d in hist) if hist else 0.0
+        bot_habilitado = p_dia > -(acc.balance * 0.05)
+
+        velas = mt5.copy_rates_from_pos("EURUSD", mt5.TIMEFRAME_M5, 0, 50)
+        if velas is not None:
+            df = pd.DataFrame(velas)
+            u8 = df['close'].rolling(8).mean().iloc[-1]
+            u21 = df['close'].rolling(21).mean().iloc[-1]
+            df['tr'] = np.maximum(df['high']-df['low'], np.maximum(abs(df['high']-df['close'].shift()), abs(df['low']-df['close'].shift())))
+            u_atr = df['tr'].rolling(14).mean().iloc[-1]
+            
+            pos = mt5.positions_get(symbol="EURUSD")
+            monitor.mostrar(u8, u21, u_atr, p_dia, acc, pos, bot_habilitado)
+
+            # Lógica Cierre/Asegurar NY (16:00)
+            if pos and t_ny.hour >= 16:
+                p = pos[0]
+                t_c = mt5.symbol_info_tick("EURUSD")
+                if p.profit < 0:
+                    mt5.order_send({"action": mt5.TRADE_ACTION_DEAL, "symbol": "EURUSD", "volume": p.volume, "type": mt5.ORDER_TYPE_SELL, "position": p.ticket, "price": t_c.bid, "magic": 123456, "type_filling": mt5.ORDER_FILLING_IOC})
+                elif p.profit > 0 and p.sl < p.price_open:
+                    mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "symbol": "EURUSD", "position": p.ticket, "sl": p.price_open + 0.00005, "tp": p.tp})
+
+            # Lógica Apertura (09:30 - 15:00) - PARCHE DE COMPATIBILIDAD NETTING
+            es_ny = (t_ny.hour == 9 and t_ny.minute >= 30) or (10 <= t_ny.hour < 15)
+            if not pos and bot_habilitado and es_ny and u8 > u21:
+                t = mt5.symbol_info_tick("EURUSD")
+                
+                # Definición de la orden base
+                request = {
+                    "action": mt5.TRADE_ACTION_DEAL,
+                    "symbol": "EURUSD",
+                    "volume": 0.01,
+                    "type": mt5.ORDER_TYPE_BUY,
+                    "price": t.ask,
+                    "sl": round(t.ask-(u_atr*2), 5),
+                    "tp": round(t.ask+(u_atr*7), 5),
+                    "magic": 123456,
+                    "type_filling": mt5.ORDER_FILLING_IOC, # Intento 1: IOC
+                    "comment": "NY Open Buy"
+                }
+                
+                result = mt5.order_send(request)
+                
+                # Si falla por filling mode, intentamos con FOK
+                if result.retcode != mt5.TRADE_RETCODE_DONE:
+                    request["type_filling"] = mt5.ORDER_FILLING_FOK # Intento 2: FOK
+                    result = mt5.order_send(request)
+                
+                if result.retcode == mt5.TRADE_RETCODE_DONE:
+                    winsound.Beep(1000, 500)
+                    registrar_bitacora("Compra ejecutada exitosamente.")
+                else:
+                    registrar_bitacora(f"Fallo crítico Broker: {result.retcode}")
+
+        time.sleep(1)
+except Exception as e: 
+    registrar_bitacora(f"Error general: {e}")
+    print(f"Error: {e}"); time.sleep(10)
+finally: mt5.shutdown()

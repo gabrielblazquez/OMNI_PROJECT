@@ -1,0 +1,108 @@
+BLOQUE A: FILOSOFÍA DE DESCUBRIMIENTO (1-20)
+No Determinismo: La IA tiene prohibido seguir una ruta fija; debe adaptarse al caos del mercado.
+
+Heurística Pura: Uso de los 90 puntos solo como consulta, nunca como leyes inviolables.
+
+Apalancamiento Libre: OMNI decide el lote según su confianza en la señal detectada.
+
+Salida Autónoma: La IA "siente" el agotamiento del precio y cierra sin esperar un TP fijo.
+
+Selección de Activos: Escaneo total de MT5; la IA elige donde hay oportunidad real.
+
+Aprendizaje por Error: Registro de fallos para no repetir patrones de pérdida.
+
+Refuerzo Positivo: Aumento de agresividad en activos donde la IA ha sido efectiva.
+
+Ignorar Indicadores: Capacidad de apagar la EMA 50 o SMA si el precio no las respeta.
+
+Detección de Anomalías: Operar movimientos fuera de lo común si hay volumen.
+
+Intuición Algorítmica: Cruce de datos históricos vs. acción del precio presente.
+(Puntos 11-20: Micro-ajustes de ponderación de señales y filtros de volatilidad dinámica).
+
+BLOQUE B: INFRAESTRUCTURA Y HARDWARE HP G42 (21-40)
+Carga de CPU: Límite preventivo al 80%.
+
+Uso de RAM: Límite de seguridad al 85%.
+
+Gestión Térmica: Reducción de ciclos si el procesador supera los 75°C.
+
+Delay Inteligente: Ajuste de velocidad del loop (1s a 5s) según la salud del sistema.
+
+Limpieza de Buffer: Comando cls constante para evitar lag en la consola.
+
+Prioridad de SO: El proceso de Python debe ser prioritario sobre otras apps.
+
+Conexión Estable: Verificación de ping con el broker antes de cada envío.
+
+Modo Emergencia: Cierre de procesos secundarios si el sistema se estresa.
+
+Optimización de Código: Uso de librerías ligeras para no saturar el hardware antiguo.
+
+Auto-arranque: El script debe ser capaz de reiniciarse tras un micro-corte.
+(Puntos 31-40: Diagnósticos de drivers, red y consumo de energía de la laptop).
+
+BLOQUE C: GESTIÓN DE CAPITAL Y ESCALABILIDAD (41-60)
+Crecimiento Exponencial: Estrategia diseñada para escalar desde 30 USD.
+
+Protección de Saldo: No operar si el margen libre pone en riesgo la cuenta.
+
+Reinversión de Ganancias: Cálculo automático del nuevo balance para subir lotaje.
+
+Slippage Check: Medir la diferencia entre el precio pedido y el ejecutado.
+
+Filtro de Spread: La IA puede decidir no entrar si el spread es muy ancho.
+
+Validación de Broker: Confirmación de que el servidor responde en tiempo real.
+
+Límite de Pérdida Diaria: Umbral de seguridad para proteger el capital semilla.
+
+Análisis de Balance: Monitoreo de la equidad (Equity) vs. Balance.
+
+Cierre por Inactividad: Si el capital no crece en X tiempo, cambiar de activo.
+
+Auditoría de Lotes: Verificación de que el broker respeta el volumen pedido.
+(Puntos 51-60: Fórmulas de interés compuesto y gestión de retiros teóricos).
+
+BLOQUE D: COMUNICACIÓN Y PERSISTENCIA (61-80)
+Identidad Blindada: Prohibición de nombres erróneos (No Carlitos).
+
+Perfil Profesional: Contexto de Radiología/Bioimágenes integrado.
+
+Comando 'Continuar': Gatillo para carga de memoria de largo plazo.
+
+Sesión 8-10: Identificador de versión para evitar mezclas con chats antiguos.
+
+Interfaz Colorama: Visualización clara (Cian: Info / Verde: Éxito / Rojo: Alerta).
+
+Log Heurístico: La IA debe explicar por qué ignoró una referencia.
+
+Reporte de 'Evitados': Conteo de operaciones filtradas por riesgo.
+
+Sincronización UTC-3: Horario exacto de Buenos Aires para cierres de mercado.
+
+Backup JSON: Guardado físico del estado de la IA cada 5 minutos.
+
+Modo Silencioso: Capacidad de operar sin mostrar logs pesados si se solicita.
+(Puntos 71-80: Personalización de alertas y reportes de rendimiento semanal).
+
+BLOQUE E: PROTOCOLOS DE CIERRE Y EVOLUCIÓN (81-90)
+Filtro Market Closed: Detección de cierre de mercado (Punto crítico de tu imagen).
+
+Filling Mode: Selección automática de llenado de orden (IOC/FOK).
+
+Magic Number: Identificación de órdenes propia para OMNI v55.9.
+
+Trailing Stop Heurístico: Persecución de tendencia sin valores fijos.
+
+Break Even Dinámico: Mover SL a entrada cuando la IA lo considere seguro.
+
+Cierre Parcial Dinámico: Asegurar ganancias según el volumen del momento.
+
+Análisis de Sentimiento: Correlación SP500 vs. Cripto para decidir sesgo.
+
+Auto-Terminación: Apagado total si se detecta fallo crítico en el hardware.
+
+Botón de Pánico: Respuesta inmediata al comando 'ABORTAR'.
+
+Evolución v56.0: El script debe preparar el terreno para su propia mejora

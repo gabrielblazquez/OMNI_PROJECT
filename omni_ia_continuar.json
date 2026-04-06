@@ -1,0 +1,1 @@
+{"status": "continuar", "memoria": {"ratio_exito": 0.5, "total": 0, "umbral": 90, "vol_adj": 1.2, "sensibilidad_inercia": 20, "gen": 1003, "exitos": 0, "fallos": 0, "v_adj": 1.2, "oro_guardia": 2.0, "cpu_limite": 75, "max_p_diaria": 15.0, "oro_adj": 2.0}}

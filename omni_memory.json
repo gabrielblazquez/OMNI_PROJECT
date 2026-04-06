@@ -1,0 +1,79 @@
+{
+    "exitos": 166,
+    "fallos": 343,
+    "ajuste_filtro": 4.000000000000001e-05,
+    "historial": [],
+    "lecciones": [
+        {
+            "t": "22:00",
+            "r": "GANANCIA",
+            "msg": "\u00c9xito: Tendencia Confirmada"
+        },
+        {
+            "t": "22:00",
+            "r": "PERDIDA",
+            "msg": "Fallo: Reversi\u00f3n de Mercado"
+        },
+        {
+            "t": "22:00",
+            "r": "PERDIDA",
+            "msg": "Fallo: Reversi\u00f3n de Mercado"
+        },
+        {
+            "t": "22:00",
+            "r": "GANANCIA",
+            "msg": "\u00c9xito: Tendencia Confirmada"
+        },
+        {
+            "t": "22:00",
+            "r": "PERDIDA",
+            "msg": "Fallo: Reversi\u00f3n de Mercado"
+        }
+    ],
+    "ganancia": -28.780946458768657,
+    "evitados": 126,
+    "orden_viva": {
+        "activo": "XAUUSD",
+        "tipo": "SELL",
+        "precio_entrada": 4693.85,
+        "tp": 4679.7684500000005,
+        "sl": 4700.890775000001,
+        "riesgo": 2.6
+    },
+    "ordenes_activas": [
+        {
+            "activo": "EURUSD",
+            "tipo": "SELL",
+            "precio_entrada": 1.15517,
+            "tp": 1.15170449,
+            "sl": 1.156902755,
+            "riesgo": 2.6
+        },
+        {
+            "activo": "GBPUSD",
+            "tipo": "SELL",
+            "precio_entrada": 1.32534,
+            "tp": 1.3213639799999999,
+            "sl": 1.32732801,
+            "riesgo": 2.6
+        },
+        {
+            "activo": "XAUUSD",
+            "tipo": "SELL",
+            "precio_entrada": 4698.09,
+            "tp": 4683.995730000001,
+            "sl": 4705.137135,
+            "riesgo": 2.548
+        }
+    ],
+    "ops": [
+        {
+            "activo": "XAUUSD",
+            "tipo": "BUY",
+            "p_ent": 4674.72,
+            "riesgo": 1.7616725959209671,
+            "tp": 4682.082857142857,
+            "sl": 4670.302285714286
+        }
+    ]
+}
