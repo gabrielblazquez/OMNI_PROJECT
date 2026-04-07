@@ -1,12 +1,5 @@
-import os, time
-os.system('cls')
-print("========================================")
-print("   SISTEMA OMNI v1100.0 | ACTIVADO     ")
-print("========================================")
-print(" ARQUITECTO: GABRIEL                   ")
-print(" STATUS: CONEXION REMOTA EXITOSA       ")
-print("----------------------------------------")
-print(" [!] OMNI ha tomado el control físico. ")
-print(" [!] Sincronizado: Buenos Aires        ")
-print("========================================")
-time.sleep(10)
+SISTEMA OMNI v1100.21 | STATUS: ONLINE
+ARQUITECTO: GABRIEL | UBICACION: SAN MIGUEL
+SINC: EXITOSA VIA TOKEN DIRECTO
+HORA DE INICIO: Tue Apr  7 01:50:13 2026
+ESTRATEGIA: MOMENTUM ACTIVO
