@@ -1,12 +1,12 @@
 # 🛰️ OMNI DASHBOARD
 --- 
 ### 🚀 STATUS: `OPERATIVO` 
-**Arquitecto:** Gabriel | **Sincronización:** 02:19:25 
+**Arquitecto:** Gabriel | **Sincronización:** 02:20:28 
 
 | ACTIVO | PRECIO | TENDENCIA | 
 | :--- | :--- | :--- | 
-| **ETH-USD** | $2110.09 | ▲ ALCISTA | 
+| **ETH-USD** | $2110.78 | ▲ ALCISTA | 
 
-**SMA 8:** 2109.58 | **SMA 21:** 2108.37 
+**SMA 8:** 2109.67 | **SMA 21:** 2108.40 
 --- 
 *Actualizado automáticamente desde tu HP G42*
