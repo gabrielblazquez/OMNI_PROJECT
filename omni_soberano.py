@@ -23,8 +23,8 @@ def mutar_omni(nueva_arquitectura, razon):
             lineas = f.readlines()
         with open(FILE_SELF, 'w', encoding='utf-8') as f:
             for linea in lineas:
-    print('MODO: Adaptación de Riesgo. Flotante actual: $-7.49') # [IA_NUCLEO_EVOLUTIVO]
-    print('MODO: Adaptación de Riesgo. Flotante actual: $-7.49') # [IA_NUCLEO_EVOLUTIVO]
+    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.62') # [IA_NUCLEO_EVOLUTIVO]
+    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.62') # [IA_NUCLEO_EVOLUTIVO]
                 else: f.write(linea)
         
         # Sincronización con GitHub
@@ -65,7 +65,7 @@ def ejecutar_omni():
     print(f"[ESTADO] Equity: ${patrimonio:.2f} | Flotante: ${flotante:.2f}")
 
     # 3. NÚCLEO DE INFERENCIA
-    print('MODO: Adaptación de Riesgo. Flotante actual: $-7.49') # [IA_NUCLEO_EVOLUTIVO]
+    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.62') # [IA_NUCLEO_EVOLUTIVO]
     # OMNI escribirá su lógica aquí.
 
     # 4. AUTO-EDICIÓN PROACTIVA
