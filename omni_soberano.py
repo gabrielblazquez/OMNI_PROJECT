@@ -47,8 +47,8 @@ def mutar_omni(nueva_logica, motivo):
             lineas = f.readlines()
         with open(FILE_SELF, 'w', encoding='utf-8') as f:
             for linea in lineas:
-    if sigma > 17.2514: print('IA: Alerta de Volatilidad Extrema') # [IA_NUCLEO_EVOLUTIVO]
-    if sigma > 17.2514: print('IA: Alerta de Volatilidad Extrema') # [IA_NUCLEO_EVOLUTIVO]
+    if sigma > 17.2644: print('IA: Alerta de Volatilidad Extrema') # [IA_NUCLEO_EVOLUTIVO]
+    if sigma > 17.2644: print('IA: Alerta de Volatilidad Extrema') # [IA_NUCLEO_EVOLUTIVO]
                 else: f.write(linea)
         
         subprocess.run(["git", "add", "."], shell=True, capture_output=True)
@@ -87,7 +87,7 @@ def ejecutar_omni():
     print(f"[{ba.strftime('%H:%M:%S')}] Equity: ${patrimonio:.2f} | Flotante: ${flotante:.2f} | Σ:{sigma:.4f}", flush=True)
 
     # 3. NÚCLEO DE INFERENCIA
-    if sigma > 17.2514: print('IA: Alerta de Volatilidad Extrema') # [IA_NUCLEO_EVOLUTIVO]
+    if sigma > 17.2644: print('IA: Alerta de Volatilidad Extrema') # [IA_NUCLEO_EVOLUTIVO]
     # OMNI escribirá aquí su lógica de pensamiento líquido.
 
     # 4. PROTOCOLO DE DEFENSA ACTIVA
