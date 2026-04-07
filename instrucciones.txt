@@ -1,1 +1,12 @@
-
+import os, time
+os.system('cls')
+print("========================================")
+print("   SISTEMA OMNI v1100.0 | ACTIVADO     ")
+print("========================================")
+print(" ARQUITECTO: GABRIEL                   ")
+print(" STATUS: CONEXION REMOTA EXITOSA       ")
+print("----------------------------------------")
+print(" [!] OMNI ha tomado el control físico. ")
+print(" [!] Sincronizado: Buenos Aires        ")
+print("========================================")
+time.sleep(10)
