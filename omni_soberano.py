@@ -26,9 +26,9 @@ def mutar_omni(nueva_logica, motivo):
         
         with open(FILE_SELF, 'w', encoding='utf-8') as f:
             for linea in lineas:
-    print('ESTADO: Defendiendo Equity. Flotante actual: $-10.56') # [IA_NUCLEO_EVOLUTIVO]
+    print('ESTADO: Defendiendo Equity. Flotante actual: $-10.18') # [IA_NUCLEO_EVOLUTIVO]
                     # Forzamos los 4 espacios de sangría para evitar IndentationError
-    print('ESTADO: Defendiendo Equity. Flotante actual: $-10.56') # [IA_NUCLEO_EVOLUTIVO]
+    print('ESTADO: Defendiendo Equity. Flotante actual: $-10.18') # [IA_NUCLEO_EVOLUTIVO]
                 else:
                     f.write(linea)
         
@@ -67,7 +67,7 @@ def ejecutar_omni():
     print(f"[{ba.strftime('%H:%M:%S')}] P:${patrimonio:.2f} | F:${flotante:.2f} | Σ:{sigma:.4f}", flush=True)
 
     # 3. NÚCLEO DE INFERENCIA
-    print('ESTADO: Defendiendo Equity. Flotante actual: $-10.56') # [IA_NUCLEO_EVOLUTIVO]
+    print('ESTADO: Defendiendo Equity. Flotante actual: $-10.18') # [IA_NUCLEO_EVOLUTIVO]
     # OMNI escribirá aquí su lógica de pensamiento líquido.
 
     # 4. DISPARADORES DE AUTO-EDICIÓN
