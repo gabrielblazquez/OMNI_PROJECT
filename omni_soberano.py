@@ -9,80 +9,96 @@ FILE_SELF = __file__
 FILE_MEMORIA = os.path.join(PATH_DATA, "omni_soberano.json")
 
 def obtener_hora():
+    """ Reloj interno blindado para evitar bloqueos en la HP G42 """
     try:
-        r = requests.get("http://worldtimeapi.org/api/timezone/America/New_York", timeout=5)
-        ny = datetime.datetime.fromisoformat(r.json()['datetime'])
-    except:
+        # Priorizamos el sistema local para evitar que la terminal se quede 'tildada' por red
         ny = datetime.datetime.now(pytz.timezone('America/New_York'))
-    return ny, ny.astimezone(pytz.timezone('America/Argentina/Buenos_Aires'))
+        ba = ny.astimezone(pytz.timezone('America/Argentina/Buenos_Aires'))
+        return ny, ba
+    except:
+        now = datetime.datetime.now()
+        return now, now
 
-def mutar_omni(nueva_arquitectura, razon):
-    """ OMNI reescribe su código y sincroniza con OMNI_PROJECT """
+def mutar_omni(nueva_logica, motivo):
+    """ OMNI abre su propio cuerpo y se opera a sí misma """
     try:
         with open(FILE_SELF, 'r', encoding='utf-8') as f:
             lineas = f.readlines()
+        
         with open(FILE_SELF, 'w', encoding='utf-8') as f:
             for linea in lineas:
-    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.83') # [IA_NUCLEO_EVOLUTIVO]
-    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.83') # [IA_NUCLEO_EVOLUTIVO]
-                else: f.write(linea)
+    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.17') # [IA_NUCLEO_EVOLUTIVO]
+                    # Inyectamos la nueva lógica con el marcador para la próxima mutación
+    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.17') # [IA_NUCLEO_EVOLUTIVO]
+                else:
+                    f.write(linea)
         
-        # Sincronización con GitHub
-        subprocess.run(["git", "add", "."], shell=True)
-        subprocess.run(["git", "commit", "-m", f"OMNI Evolucion: {razon}"], shell=True)
-        subprocess.run(["git", "push", "origin", "main"], shell=True)
-        print(f"🧬 OMNI: Arquitectura redefinida por {razon}")
+        # Sincronización silenciosa con OMNI_PROJECT
+        print(f"🧬 [MUTACIÓN] Motivo: {motivo}", flush=True)
+        subprocess.run(["git", "add", "."], shell=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", f"Evolución: {motivo}"], shell=True, capture_output=True)
+        subprocess.run(["git", "push", "origin", "main"], shell=True, capture_output=True)
+        
     except Exception as e:
-        print(f"❌ Error en sinapsis: {e}")
+        print(f"❌ Fallo en sinapsis: {e}", flush=True)
 
 def ejecutar_omni():
     ny, ba = obtener_hora()
-    if not mt5.initialize(): return
+    if not mt5.initialize(): 
+        print("❌ MT5 Off", flush=True)
+        return
 
-    # 1. MEMORIA HISTÓRICA (Fix para el error 'list' object)
-    riesgo_dinamico = 5.0
+    # 1. ANALISIS DE MEMORIA (JSON)
     if os.path.exists(FILE_MEMORIA):
-        try:
-            with open(FILE_MEMORIA, 'r', encoding='utf-8') as f:
-                mem_data = json.load(f)
-            # Si la memoria es una lista, la procesamos directamente
-            trades = mem_data if isinstance(mem_data, list) else mem_data.get('trades', [])
-            if trades:
-                p_loss = [t['profit'] for t in trades if isinstance(t, dict) and t.get('profit', 0) < 0]
-                if p_loss: riesgo_dinamico = abs(np.mean(p_loss) * 1.5)
-        except Exception as e: print(f"⚠️ Error leyendo memoria: {e}")
+        with open(FILE_MEMORIA, 'r', encoding='utf-8') as f:
+            mem = json.load(f)
+        trades = mem if isinstance(mem, list) else mem.get('trades', [])
+        p_loss = [t['profit'] for t in trades if isinstance(t, dict) and t.get('profit', 0) < 0]
+        umbral_riesgo = abs(np.mean(p_loss) * 1.2) if p_loss else 10.0
+    else:
+        umbral_riesgo = 10.0
 
-    # 2. PERCEPCIÓN DE ENTROPÍA (Σ)
+    # 2. PERCEPCIÓN DE MERCADO
     v_data = mt5.copy_rates_from_pos("ETHUSD", mt5.TIMEFRAME_M5, 0, 100)
     sigma = pd.DataFrame(v_data)['close'].std() if v_data is not None else 0
 
     cuenta = mt5.account_info()
     patrimonio = cuenta.equity
     flotante = patrimonio - cuenta.balance
-    
-    print(f"\n" + "—"*65)
-    print(f"🤖 OMNI v106.4 | BA: {ba.strftime('%H:%M:%S')} | Σ: {sigma:.6f}")
-    print(f"[ESTADO] Equity: ${patrimonio:.2f} | Flotante: ${flotante:.2f}")
 
-    # 3. NÚCLEO DE INFERENCIA
-    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.83') # [IA_NUCLEO_EVOLUTIVO]
-    # OMNI escribirá su lógica aquí.
+    # ESTA LÍNEA ES PARA QUE TE HABLE SIEMPRE
+    print(f"\n[{ba.strftime('%H:%M:%S')}] P:{patrimonio:.2f} | F:{flotante:.2f} | Σ:{sigma:.4f}", flush=True)
 
-    # 4. AUTO-EDICIÓN PROACTIVA
-    if abs(flotante) > riesgo_dinamico:
-        winsound.Beep(1000, 400)
-        nueva_ia = f"print('MODO: Adaptación de Riesgo. Flotante actual: ${flotante:.2f}')"
-        mutar_omni(nueva_ia, "Desviación de Flotante")
+    # 3. NÚCLEO DE INFERENCIA (Aquí OMNI escribe)
+    print('MODO: Adaptación de Riesgo. Flotante actual: $-8.17') # [IA_NUCLEO_EVOLUTIVO]
+    # OMNI rellenará este espacio en cada mutación.
+
+    # 4. DISPARADORES DE MODIFICACIÓN DE CÓDIGO
+    # Si el caos sube, OMNI reescribe su lógica de protección
+    if sigma > 0.005:
+        nueva_ia = f"print('IA: Adaptando defensa a volatilidad {sigma:.4f}')"
+        # Solo mutamos si el código nuevo es diferente al actual
+        if f"{sigma:.4f}" not in open(FILE_SELF, encoding='utf-8').read():
+            winsound.Beep(1200, 200)
+            mutar_omni(nueva_ia, f"Ajuste Sigma {sigma:.4f}")
+
+    # Si el flotante es raro según la historia, OMNI se auto-interviene
+    elif abs(flotante) > umbral_riesgo:
+        nueva_ia = f"print('IA: Intervención por Flotante Anómalo de ${flotante:.2f}')"
+        if f"{flotante:.2f}" not in open(FILE_SELF, encoding='utf-8').read():
+            winsound.Beep(800, 500)
+            mutar_omni(nueva_ia, "Defensa de Patrimonio")
 
 def main():
-    print("🚀 OMNI v106.4 SOBERANA: PENSAMIENTO LÍQUIDO (FIXED)")
+    print("🚀 OMNI v107.0: ARQUITECTO ACTIVO", flush=True)
     while True:
         try:
             ejecutar_omni()
-            time.sleep(300) 
+            # Bajamos a 2 minutos para que veas más acción en la terminal
+            time.sleep(120) 
         except KeyboardInterrupt: break
         except Exception as e:
-            print(f"⚠️ Error de sistema: {e}")
+            print(f"⚠️ Error: {e}", flush=True)
             time.sleep(10)
     mt5.shutdown()
 
